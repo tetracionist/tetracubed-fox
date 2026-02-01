@@ -238,7 +238,7 @@ async function handleStart(interaction) {
 
     const result = await apiClient.startServer();
 
-    const serverAddress = process.env.SERVER_HOSTNAME || result.hostname || result.public_ip;
+    const serverAddress = process.env.SERVER_HOSTNAME || result.public_ip;
 
     const successEmbed = new EmbedBuilder()
         .setColor('#00ff00')
@@ -316,8 +316,8 @@ async function handleStatus(interaction) {
     if (result.message) {
         statusEmbed.setDescription(result.message);
     } else if (result.outputs) {
-        // Show server hostname prominently if available
-        const serverAddress = process.env.SERVER_HOSTNAME || result.outputs.hostname || result.outputs.public_ip;
+        // Show server public IP prominently if available
+        const serverAddress = process.env.SERVER_HOSTNAME || result.outputs.public_ip;
         if (serverAddress) {
             statusEmbed.setDescription(`**Server Address:** \`${serverAddress}\``);
         }
@@ -352,7 +352,7 @@ async function handleStatus(interaction) {
         }
 
         // Add any remaining fields
-        const shownFields = ['public_ip', 'hostname', 'ecs_cluster_name', 'ecs_service_name'];
+        const shownFields = ['public_ip', 'ecs_cluster_name', 'ecs_service_name'];
         for (const [key, value] of Object.entries(result.outputs)) {
             if (!shownFields.includes(key)) {
                 statusEmbed.addFields({
@@ -484,10 +484,8 @@ async function handlePingServer(interaction) {
         // First, get the server IP from the API
         const result = await apiClient.getResources();
 
-        // Use configured hostname, or fall back to API outputs
-        const serverAddress = process.env.SERVER_HOSTNAME || result.outputs?.hostname || result.outputs?.public_ip;
-
-        if (!serverAddress) {
+        // Check if public_ip exists - this indicates if infrastructure is provisioned
+        if (!result.outputs?.public_ip) {
             const offlineEmbed = new EmbedBuilder()
                 .setColor('#ff0000')
                 .setTitle('🔴 Server Offline')
@@ -501,6 +499,10 @@ async function handlePingServer(interaction) {
             await interaction.editReply({ embeds: [offlineEmbed] });
             return;
         }
+
+        // Infrastructure is up - determine address to ping
+        // Use configured hostname (DDNS), or fall back to public IP
+        const serverAddress = process.env.SERVER_HOSTNAME || result.outputs.public_ip;
 
         const serverPort = 25565; // Default Minecraft port
 
@@ -569,10 +571,8 @@ async function updateBotStatus() {
         // Get server info from API
         const result = await apiClient.getResources();
 
-        // Use configured hostname or fall back to API outputs
-        const serverAddress = process.env.SERVER_HOSTNAME || result.outputs?.hostname || result.outputs?.public_ip;
-
-        if (!serverAddress) {
+        // Check if public_ip exists - this indicates if infrastructure is provisioned
+        if (!result.outputs?.public_ip) {
             // Server is offline
             client.user.setPresence({
                 activities: [{ name: '🔴 Server Offline', type: 3 }], // Type 3 = Watching
@@ -580,6 +580,10 @@ async function updateBotStatus() {
             });
             return;
         }
+
+        // Infrastructure is up - determine address to ping
+        // Use configured hostname (DDNS), or fall back to public IP
+        const serverAddress = process.env.SERVER_HOSTNAME || result.outputs.public_ip;
 
         try {
             // Ping the Minecraft server to get player count
