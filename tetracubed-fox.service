@@ -1,0 +1,19 @@
+[Unit]
+Description=Tetracubed Fox Discord Bot
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/tetracubed-fox
+Environment="NODE_ENV=production"
+EnvironmentFile=/home/ubuntu/tetracubed-fox/.env
+ExecStart=/usr/bin/node /home/ubuntu/tetracubed-fox/src/index.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tetracubed-fox
+
+[Install]
+WantedBy=multi-user.target

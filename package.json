@@ -1,0 +1,19 @@
+{
+  "name": "tetracubed-fox",
+  "version": "1.0.0",
+  "description": "Discord bot for managing Tetracubed Minecraft servers",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "keywords": ["discord", "bot", "minecraft", "tetracubed"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "discord.js": "^14.17.3",
+    "dotenv": "^16.4.7",
+    "axios": "^1.7.9"
+  }
+}
