@@ -41,7 +41,7 @@ if [ -d "$APP_DIR" ]; then
 else
     echo "📁 Cloning repository..."
     cd /home/ubuntu
-    git clone https://github.com/yourusername/tetracubed-fox.git
+    git clone https://github.com/tetracionist/tetracubed-fox.git
     cd tetracubed-fox
 fi
 
