@@ -83,13 +83,11 @@ async function sendNotification(embed) {
 const commands = [
     {
         name: 'start',
-        description: 'Start the Tetracubed Minecraft server',
-        default_member_permissions: PermissionFlagsBits.Administrator.toString()
+        description: 'Start the Tetracubed Minecraft server'
     },
     {
         name: 'stop',
-        description: 'Stop the Tetracubed Minecraft server',
-        default_member_permissions: PermissionFlagsBits.Administrator.toString()
+        description: 'Stop the Tetracubed Minecraft server'
     },
     {
         name: 'status',
