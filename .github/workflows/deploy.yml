@@ -1,0 +1,74 @@
+name: Deploy Tetracubed Fox
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to server
+        env:
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          REMOTE_DIR: ${{ secrets.REMOTE_DIR || '/home/ubuntu/tetracubed-fox' }}
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          API_USERNAME: ${{ secrets.API_USERNAME }}
+          API_PASSWORD: ${{ secrets.API_PASSWORD }}
+          ALLOWED_ROLE_ID: ${{ secrets.ALLOWED_ROLE_ID }}
+          ADMIN_USER_IDS: ${{ secrets.ADMIN_USER_IDS }}
+          NOTIFICATION_CHANNEL_ID: ${{ secrets.NOTIFICATION_CHANNEL_ID }}
+          SERVER_HOSTNAME: ${{ secrets.SERVER_HOSTNAME }}
+        run: |
+          # Set up SSH key
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+
+          # Sync files
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            --exclude 'node_modules' \
+            --exclude '.env' \
+            --exclude '.git' \
+            --exclude '.claude' \
+            --exclude '.github' \
+            ./ "$SSH_USER@$SSH_HOST:$REMOTE_DIR/"
+
+          # Write .env on server from GitHub secrets
+          printf '%s\n' \
+            "DISCORD_TOKEN=$DISCORD_TOKEN" \
+            "API_BASE_URL=$API_BASE_URL" \
+            "API_USERNAME=$API_USERNAME" \
+            "API_PASSWORD=$API_PASSWORD" \
+            "ALLOWED_ROLE_ID=$ALLOWED_ROLE_ID" \
+            "ADMIN_USER_IDS=$ADMIN_USER_IDS" \
+            "NOTIFICATION_CHANNEL_ID=$NOTIFICATION_CHANNEL_ID" \
+            "SERVER_HOSTNAME=$SERVER_HOSTNAME" | \
+            ssh -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" "cat > $REMOTE_DIR/.env"
+
+          # Install deps, show versions & restart
+          ssh -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
+            "cd $REMOTE_DIR && npm install --omit=dev && npm ls --depth=0 && sudo systemctl restart tetracubed-fox"
+
+      - name: Show startup logs
+        env:
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
+            "sudo journalctl -u tetracubed-fox --since '6 minutes ago' --no-pager"
