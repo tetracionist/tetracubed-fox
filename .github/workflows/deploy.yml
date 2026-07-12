@@ -56,9 +56,25 @@ jobs:
             "SERVER_HOSTNAME=$SERVER_HOSTNAME" | \
             ssh -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" "cat > $REMOTE_DIR/.env"
 
-          # Install deps, show versions & restart
-          ssh -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
-            "cd $REMOTE_DIR && npm install --omit=dev && npm ls --depth=0 && sudo systemctl restart tetracubed-fox"
+          # Install deps, refresh the --user unit if it changed, and restart.
+          # No sudo: everything runs under the deploy user's own systemd instance
+          # (requires `loginctl enable-linger <user>` to have been set up once).
+          ssh -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" "
+            set -e
+            export XDG_RUNTIME_DIR=/run/user/\$(id -u)
+            export NVM_DIR=\$HOME/.nvm; . \$NVM_DIR/nvm.sh
+            cd $REMOTE_DIR
+            chmod +x deploy/run.sh
+            npm install --omit=dev
+            npm ls --depth=0 || true
+            mkdir -p \$HOME/.config/systemd/user
+            if ! cmp -s deploy/tetracubed-fox.service \$HOME/.config/systemd/user/tetracubed-fox.service 2>/dev/null; then
+              cp deploy/tetracubed-fox.service \$HOME/.config/systemd/user/tetracubed-fox.service
+              systemctl --user daemon-reload
+            fi
+            systemctl --user enable tetracubed-fox
+            systemctl --user restart tetracubed-fox
+          "
 
       - name: Show startup logs
         env:
@@ -71,4 +87,4 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
           ssh -i ~/.ssh/deploy_key "$SSH_USER@$SSH_HOST" \
-            "sudo journalctl -u tetracubed-fox --since '6 minutes ago' --no-pager"
+            "XDG_RUNTIME_DIR=/run/user/\$(id -u) journalctl --user -u tetracubed-fox --since '6 minutes ago' --no-pager"
