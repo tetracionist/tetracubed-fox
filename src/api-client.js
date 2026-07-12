@@ -53,14 +53,18 @@ export class TetracubedAPIClient {
                     headers: {
                         'Authorization': `Bearer ${this.accessToken}`
                     },
-                    timeout: 900000 // 15 minutes timeout for server start
+                    timeout: 1800000 // 30 minutes — provisioning has been observed to take 15m+
                 }
             );
 
             return response.data;
         } catch (error) {
             console.error('Start server failed:', error.response?.data || error.message);
-            throw new Error(error.response?.data?.detail || 'Failed to start server');
+            const wrapped = new Error(error.response?.data?.detail || 'Failed to start server');
+            // Provisioning can outlive the 15-minute request timeout while still
+            // succeeding — callers use this flag to fall back to polling.
+            wrapped.isTimeout = error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT';
+            throw wrapped;
         }
     }
 
@@ -75,7 +79,7 @@ export class TetracubedAPIClient {
                     headers: {
                         'Authorization': `Bearer ${this.accessToken}`
                     },
-                    timeout: 900000 // 15 minutes timeout for server stop
+                    timeout: 1800000 // 30 minutes — deprovisioning can also run long
                 }
             );
 

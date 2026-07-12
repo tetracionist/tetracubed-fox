@@ -79,6 +79,49 @@ async function sendNotification(embed) {
     }
 }
 
+// Edit the deferred reply, falling back to a plain channel message when the
+// interaction token has expired (Discord invalidates it 15 minutes after the
+// command is invoked — long server starts routinely outlive it).
+async function safeReply(interaction, payload) {
+    try {
+        await interaction.editReply(payload);
+    } catch (error) {
+        console.error('editReply failed, falling back to channel message:', error.message);
+        try {
+            await interaction.channel.send(payload);
+        } catch (sendError) {
+            console.error('Channel fallback also failed:', sendError.message);
+        }
+    }
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Wait for the Minecraft server to come online, for when the start API call
+// times out while provisioning is still finishing.
+async function waitForServerUp(maxWaitMs, intervalMs = 30000) {
+    const deadline = Date.now() + maxWaitMs;
+
+    while (Date.now() < deadline) {
+        try {
+            const result = await apiClient.getResources();
+            const publicIp = result.outputs?.public_ip;
+
+            if (publicIp) {
+                const serverAddress = process.env.SERVER_HOSTNAME || publicIp;
+                await status(serverAddress, 25565, { timeout: 5000 });
+                return { public_ip: publicIp };
+            }
+        } catch (error) {
+            // Not up yet — keep polling
+        }
+
+        await sleep(intervalMs);
+    }
+
+    throw new Error('The start request timed out and the server has not come online yet. It may still be provisioning — check `/ping-server` in a few minutes.');
+}
+
 // Define slash commands
 const commands = [
     {
@@ -202,7 +245,7 @@ client.on('interactionCreate', async (interaction) => {
             .setTimestamp();
 
         if (interaction.replied || interaction.deferred) {
-            await interaction.editReply({ embeds: [errorEmbed] });
+            await safeReply(interaction, { embeds: [errorEmbed] });
         } else {
             await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
         }
@@ -234,7 +277,22 @@ async function handleStart(interaction) {
 
     await interaction.editReply({ embeds: [startEmbed] });
 
-    const result = await apiClient.startServer();
+    let result;
+    try {
+        result = await apiClient.startServer();
+    } catch (error) {
+        if (!error.isTimeout) throw error;
+
+        const stillStartingEmbed = new EmbedBuilder()
+            .setColor('#ffaa00')
+            .setTitle('⏳ Still Starting...')
+            .setDescription('Provisioning is taking longer than usual. Waiting for the server to come online...')
+            .setTimestamp();
+
+        await safeReply(interaction, { embeds: [stillStartingEmbed] });
+
+        result = await waitForServerUp(15 * 60 * 1000);
+    }
 
     const serverAddress = process.env.SERVER_HOSTNAME || result.public_ip;
 
@@ -250,7 +308,7 @@ async function handleStart(interaction) {
         )
         .setTimestamp();
 
-    await interaction.editReply({ embeds: [successEmbed] });
+    await safeReply(interaction, { embeds: [successEmbed] });
 
     // Send notification to channel
     await sendNotification(successEmbed);
@@ -295,7 +353,7 @@ async function handleStop(interaction) {
         )
         .setTimestamp();
 
-    await interaction.editReply({ embeds: [successEmbed] });
+    await safeReply(interaction, { embeds: [successEmbed] });
 
     // Send notification to channel
     await sendNotification(successEmbed);

@@ -27,7 +27,7 @@ A populated `.env` (see `.env.example`) is required — `index.js` exits on star
 
 **Server address resolution.** `SERVER_HOSTNAME` (a DDNS name) wins over `result.outputs.public_ip` everywhere the address is shown or pinged. The IP is the fallback when DDNS isn't configured. Keep this precedence consistent if adding new commands.
 
-**Start/stop are long.** `apiClient.startServer()` / `stopServer()` set `timeout: 900000` (15 min) because AWS provisioning runs synchronously inside the API call. Discord interactions are `deferReply()`'d for the same reason. Don't shorten these timeouts.
+**Start/stop are long.** `apiClient.startServer()` / `stopServer()` set `timeout: 1800000` (30 min — real provisioning runs have exceeded 15 min) because AWS provisioning runs synchronously inside the API call. Discord interactions are `deferReply()`'d for the same reason, but the interaction token itself dies 15 minutes after invocation, so completion/error messages must go through `safeReply()` (editReply with a channel-message fallback), and a timed-out start falls back to `waitForServerUp()` polling. Don't shorten these timeouts or bypass `safeReply` for anything that runs long.
 
 **Token caching.** `TetracubedAPIClient` refreshes its OAuth token at 25 minutes (API tokens expire at 30). Every method calls `ensureAuthenticated()` first — don't bypass it.
 
