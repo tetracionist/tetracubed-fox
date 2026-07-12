@@ -18,7 +18,7 @@ jobs:
           SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
-          REMOTE_DIR: ${{ secrets.REMOTE_DIR || '/home/ubuntu/tetracubed-fox' }}
+          REMOTE_DIR: ${{ secrets.REMOTE_DIR || '/home/tetracubed-fox' }}
           DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
           API_BASE_URL: ${{ secrets.API_BASE_URL }}
           API_USERNAME: ${{ secrets.API_USERNAME }}
